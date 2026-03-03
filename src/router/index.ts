@@ -8,17 +8,26 @@ const routes: Array<RouteRecordRaw> = [
     name: "Login",
     component: () => import("../views/Login.vue"),
   },
+  // kasir dashboard
   {
     path: "/",
     name: "Kasir",
     component: () => import("../views/Kasir.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, roles: ["kasir"] },
   },
+  // admin toko (manajer toko)
   {
-    path: "/admin",
-    name: "Admin",
+    path: "/admin-toko",
+    name: "AdminToko",
     component: () => import("../views/Admin.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, roles: ["admin"] },
+  },
+  // super administrator (developer)
+  {
+    path: "/superadmin",
+    name: "SuperAdmin",
+    component: () => import("../views/SuperAdmin.vue"),
+    meta: { requiresAuth: true, roles: ["superadmin"] },
   },
   {
     path: "/menu",
@@ -32,18 +41,39 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach(async (to, from, next) => {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+import { useAuthStore } from "../stores/authStore";
 
+router.beforeEach(async (to, from, next) => {
+  const auth = useAuthStore();
+  await auth.loadUser();
+
+  const session = auth.user;
+  const role = auth.profile?.role;
+
+  // redirect unauthenticated users
   if (to.meta.requiresAuth && !session) {
-    next({ name: "Login" });
-  } else if (to.name === "Login" && session) {
-    next({ name: "Kasir" });
-  } else {
-    next();
+    return next({ name: "Login" });
   }
+
+  // already logged in, don't show login page
+  if (to.name === "Login" && session) {
+    // choose destination based on role
+    if (role === "superadmin") return next({ name: "SuperAdmin" });
+    if (role === "admin") return next({ name: "AdminToko" });
+    if (role === "kasir") return next({ name: "Kasir" });
+    return next({ name: "Kasir" });
+  }
+
+  // role guard
+  const allowedRoles: string[] | undefined = to.meta.roles as any;
+  if (allowedRoles && session) {
+    if (!allowedRoles.includes(role || "")) {
+      // optionally redirect to a 403 page or home
+      return next({ name: "Login" });
+    }
+  }
+
+  next();
 });
 
 export default router;

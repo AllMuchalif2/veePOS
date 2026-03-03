@@ -2,8 +2,10 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { supabase } from "../supabaseClient";
+import { useAuthStore } from "../stores/authStore";
 
 const router = useRouter();
+const auth = useAuthStore();
 const email = ref("");
 const password = ref("");
 const loading = ref(false);
@@ -21,8 +23,16 @@ const handleLogin = async () => {
 
     if (error) throw error;
 
-    // Redirect to POS Kasir view on success
-    router.push("/");
+    // load profile and redirect based on role
+    await auth.loadUser();
+    const role = auth.profile?.role;
+    if (role === "superadmin") {
+      router.push({ name: "SuperAdmin" });
+    } else if (role === "admin") {
+      router.push({ name: "AdminToko" });
+    } else {
+      router.push({ name: "Kasir" });
+    }
   } catch (error: any) {
     errorMsg.value = error.message || "Login failed";
   } finally {
