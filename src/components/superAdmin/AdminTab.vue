@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AdminModal from "./AdminModal.vue";
-import { useSuperAdminAdminManagement } from "../composables/useSuperAdminAdminManagement";
+import { useSuperAdminAdminManagement } from "../../composables/useSuperAdminAdminManagement";
 
 const admin = useSuperAdminAdminManagement();
 

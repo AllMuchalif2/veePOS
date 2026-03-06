@@ -45,23 +45,9 @@ export function useSuperAdminAdminManagement() {
 
       isCreating.value = true;
 
-      const { createClient } = await import("@supabase/supabase-js");
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-
-      if (!serviceRoleKey) {
-        throw new Error(
-          "Service Role Key tidak ditemukan di .env.local. Hubungi administrator.",
-        );
-      }
-
-      const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-          detectSessionInUrl: false,
-        },
-      });
+      // Get Supabase Admin Client
+      const { getSupabaseAdmin } = await import("../../supabaseAdmin");
+      const supabaseAdmin = getSupabaseAdmin();
 
       const { data: authData, error: authError } =
         await supabaseAdmin.auth.admin.createUser({

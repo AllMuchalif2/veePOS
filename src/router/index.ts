@@ -24,7 +24,7 @@ const routes: Array<RouteRecordRaw> = [
   },
   // super administrator (developer)
   {
-    path: "/superadmin",
+    path: "/super-admin",
     name: "SuperAdmin",
     component: () => import("../views/SuperAdmin.vue"),
     meta: { requiresAuth: true, roles: ["superadmin"] },

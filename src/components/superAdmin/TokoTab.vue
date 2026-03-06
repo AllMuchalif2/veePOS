@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useSuperadminStore } from "../stores/superadminStore";
+import { useSuperadminStore } from "../../stores/superadminStore";
 import TokoModal from "./TokoModal.vue";
-import { useSuperAdminTokoManagement } from "../composables/useSuperAdminTokoManagement";
+import { useSuperAdminTokoManagement } from "../../composables/useSuperAdminTokoManagement";
 
 const adminStore = useSuperadminStore();
 const toko = useSuperAdminTokoManagement();

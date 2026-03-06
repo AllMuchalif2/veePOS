@@ -19,6 +19,7 @@ export interface Produk {
 export interface Meja {
   id: string;
   nomor_meja: string;
+  status?: string;
 }
 
 export interface CartItem extends Produk {
@@ -76,10 +77,19 @@ export const usePosStore = defineStore("pos", () => {
         if (prodRes.data) products.value = prodRes.data;
         if (tableRes.data) tables.value = tableRes.data;
 
-        // Cache to LocalForage
-        await localforage.setItem("pos_categories", categories.value);
-        await localforage.setItem("pos_products", products.value);
-        await localforage.setItem("pos_tables", tables.value);
+        // Cache to LocalForage (strip proxies to avoid DataCloneError)
+        await localforage.setItem(
+          "pos_categories",
+          JSON.parse(JSON.stringify(categories.value)),
+        );
+        await localforage.setItem(
+          "pos_products",
+          JSON.parse(JSON.stringify(products.value)),
+        );
+        await localforage.setItem(
+          "pos_tables",
+          JSON.parse(JSON.stringify(tables.value)),
+        );
       } else {
         // Load from cache
         const cachedCat =
@@ -148,9 +158,9 @@ export const usePosStore = defineStore("pos", () => {
           nama_pelanggan: order.nama_pelanggan,
           tipe_pesanan: order.tipe_pesanan,
           total_harga: order.total_harga,
-          status: "selesai", 
-          nomor_pesanan: `INV-${Date.now()}`, 
-          id_kasir: userData.user.id, 
+          status: "selesai",
+          nomor_pesanan: `INV-${Date.now()}`,
+          id_kasir: userData.user.id,
         })
         .select()
         .single();

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import DashboardTab from "../components/DashboardTab.vue";
-import TokoTab from "../components/TokoTab.vue";
-import AdminTab from "../components/AdminTab.vue";
+import DashboardTab from "../components/superAdmin/DashboardTab.vue";
+import TokoTab from "../components/superAdmin/TokoTab.vue";
+import AdminTab from "../components/superAdmin/AdminTab.vue";
 import { useSuperAdminPresenter } from "../presenters/useSuperAdminPresenter";
 
 const {
