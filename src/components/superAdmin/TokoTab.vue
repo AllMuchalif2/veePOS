@@ -56,13 +56,13 @@ const handleModalUpdate = (value: string) => {
         <div class="pt-4 border-t border-gray-100 flex gap-2">
           <button
             @click="toko.openEdit(t.id)"
-            class="flex-1 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition text-sm font-medium"
+            class="flex-1 py-2 bg-info bg-opacity-20 text-info rounded-lg hover-bg-info hover:text-white transition text-sm font-medium"
           >
             Ubah
           </button>
           <button
             @click="handleDelete(t.id)"
-            class="flex-1 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm font-medium"
+            class="flex-1 py-2 bg-danger bg-opacity-20 text-danger rounded-lg hover-bg-danger hover:text-white transition text-sm font-medium"
           >
             Hapus
           </button>

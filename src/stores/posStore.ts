@@ -34,7 +34,7 @@ export interface PendingOrder {
   tipe_pesanan: "dine_in" | "takeaway" | "qr_menu";
   total_harga: number;
   items: {
-    id_produk: string;
+    id_menu: string;
     jumlah: number;
     harga_satuan: number;
     subtotal: number;
@@ -66,11 +66,37 @@ export const usePosStore = defineStore("pos", () => {
     isLoading.value = true;
     try {
       if (isOnline.value) {
-        // Fetch from Supabase
+        // Get current user's toko first
+        const { data: userData } = await supabase.auth.getUser();
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("id_toko")
+          .eq("id", userData.user?.id)
+          .single();
+
+        if (!profile?.id_toko) throw new Error("Profil toko tidak ditemukan");
+        const idToko = profile.id_toko;
+
+        // Fetch only this store's data
         const [catRes, prodRes, tableRes] = await Promise.all([
-          supabase.from("kategori").select("*").order("nama"),
-          supabase.from("produk").select("*").order("nama"),
-          supabase.from("meja").select("*").order("nomor_meja"),
+          supabase
+            .from("kategori")
+            .select("*")
+            .eq("id_toko", idToko)
+            .is("deleted_at", null)
+            .order("nama"),
+          supabase
+            .from("menu")
+            .select("*")
+            .eq("id_toko", idToko)
+            .is("deleted_at", null)
+            .order("nama"),
+          supabase
+            .from("meja")
+            .select("*")
+            .eq("id_toko", idToko)
+            .is("deleted_at", null)
+            .order("nomor_meja"),
         ]);
 
         if (catRes.data) categories.value = catRes.data;
@@ -171,7 +197,7 @@ export const usePosStore = defineStore("pos", () => {
       const details = order.items.map((item) => ({
         id_pesanan: pesanan.id,
         id_toko: profile.id_toko,
-        id_produk: item.id_produk,
+        id_menu: item.id_menu,
         jumlah: item.jumlah,
         harga_satuan: item.harga_satuan,
         subtotal: item.subtotal,

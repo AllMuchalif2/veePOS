@@ -1,141 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { supabase } from "../../supabaseClient";
-import { swalConfirm, swalSuccess, swalError } from "../../composables/useSwal";
+import { useTenantRegistrationPresenter } from "../../presenters/useTenantRegistrationPresenter";
 
-interface TenantRegistration {
-  id: string;
-  store_name: string;
-  email: string;
-  phone: string;
-  status: "pending" | "approved" | "rejected";
-  created_at: string;
-}
-
-const registrations = ref<TenantRegistration[]>([]);
-const loading = ref(true);
-const processingId = ref<string | null>(null);
-
-// Temporary credentials display (dikarenakan info ini kompleks, kita tetap tampilkan berupa UI khusus setelah sukses)
-const newTenantCreds = ref<{
-  email: string;
-  password: string;
-  store: string;
-} | null>(null);
-
-const fetchRegistrations = async () => {
-  loading.value = true;
-  try {
-    const { data, error } = await supabase
-      .from("tenant_registrations")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-    registrations.value = data || [];
-  } catch (error: any) {
-    console.error("Error fetching registrations:", error);
-    swalError("Gagal", "Gagal memuat data pendaftar");
-  } finally {
-    loading.value = false;
-  }
-};
-
-const approveTenant = async (id: string, storeName: string) => {
-  const isConfirmed = await swalConfirm(
-    "Setujui Pendaftaran?",
-    `Apakah Anda yakin ingin menyetujui pendaftaran toko "${storeName}"? Ini akan membuat akun admin toko baru.`,
-  );
-
-  if (!isConfirmed) return;
-
-  processingId.value = id;
-  newTenantCreds.value = null;
-
-  try {
-    // Memanggil Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke("approve-tenant", {
-      body: { registrationId: id },
-    });
-
-    if (error) throw error;
-
-    // Menampilkan kredensial sementara
-    newTenantCreds.value = {
-      email: data.credentials.email,
-      password: data.credentials.temporaryPassword,
-      store: storeName,
-    };
-
-    await swalSuccess("Berhasil!", `Toko ${storeName} telah aktif.`);
-    await fetchRegistrations(); // Refresh tabel
-    // Parse spesifik error Edge Function jika memungkinkan
-    let displayError = "Terjadi kesalahan saat approve tenant";
-    if (error instanceof Error) {
-      displayError = error.message;
-
-      // Khusus untuk FunctionsHttpError di Supabase JS v2
-      // Biasanya response body error ada didalam error.context atau bisa parse stringify aslinya
-      if (error.name === "FunctionsHttpError" && (error as any).context) {
-        try {
-          const bodyText = await (error as any).context.text();
-          const bodyJson = JSON.parse(bodyText);
-          if (bodyJson.error) displayError = bodyJson.error;
-        } catch (e) {
-          /* ignore */
-        }
-      }
-    }
-
-    swalError("Gagal", displayError);
-  } finally {
-    processingId.value = null;
-  }
-};
-
-const rejectTenant = async (id: string, storeName: string) => {
-  const isConfirmed = await swalConfirm(
-    "Tolak Pendaftaran?",
-    `Anda yakin ingin menolak toko "${storeName}"?`,
-  );
-  if (!isConfirmed) return;
-
-  processingId.value = id;
-
-  try {
-    const { error } = await supabase
-      .from("tenant_registrations")
-      .update({ status: "rejected" })
-      .eq("id", id);
-
-    if (error) throw error;
-
-    await swalSuccess(
-      "Ditolak",
-      `Pendaftaran toko ${storeName} telah ditolak.`,
-    );
-    await fetchRegistrations();
-  } catch (error: any) {
-    console.error("Error rejecting tenant:", error);
-    swalError("Gagal", "Gagal menolak pendaftaran");
-  } finally {
-    processingId.value = null;
-  }
-};
-
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
-onMounted(() => {
-  fetchRegistrations();
-});
+const p = useTenantRegistrationPresenter();
 </script>
 
 <template>
@@ -145,7 +11,7 @@ onMounted(() => {
         Antrean Pendaftaran Tenant
       </h2>
       <button
-        @click="fetchRegistrations"
+        @click="p.fetchRegistrations()"
         class="p-2 text-slate-500 hover:text-blue-600 transition rounded-full hover:bg-blue-50"
       >
         <svg
@@ -164,9 +30,9 @@ onMounted(() => {
       </button>
     </div>
 
-    <!-- Info Credentials Sementara (Tetap HTML karena perlu di-copy user) -->
+    <!-- Info Credentials Sementara -->
     <div
-      v-if="newTenantCreds"
+      v-if="p.newTenantCreds.value"
       class="p-4 bg-green-50/80 text-green-700 rounded-xl border border-green-200/60 shadow-sm"
     >
       <div
@@ -186,7 +52,7 @@ onMounted(() => {
             >
             <span class="font-medium text-slate-800 flex items-center gap-2">
               <i class="bx bx-envelope text-slate-400"></i>
-              {{ newTenantCreds.email }}
+              {{ p.newTenantCreds.value.email }}
             </span>
           </div>
           <div class="h-px sm:h-auto sm:w-px bg-slate-100"></div>
@@ -199,7 +65,7 @@ onMounted(() => {
               class="font-mono font-medium text-slate-800 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded flex items-center gap-2"
             >
               <i class="bx bx-lock-alt text-slate-400"></i>
-              {{ newTenantCreds.password }}
+              {{ p.newTenantCreds.value.password }}
             </span>
           </div>
         </div>
@@ -228,12 +94,12 @@ onMounted(() => {
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            <tr v-if="loading">
+            <tr v-if="p.loading.value">
               <td colspan="5" class="p-8 text-center text-slate-500">
                 Memuat data...
               </td>
             </tr>
-            <tr v-else-if="registrations.length === 0">
+            <tr v-else-if="p.registrations.value.length === 0">
               <td colspan="5" class="py-12">
                 <div
                   class="flex flex-col items-center justify-center text-slate-500"
@@ -257,12 +123,12 @@ onMounted(() => {
             </tr>
             <tr
               v-else
-              v-for="reg in registrations"
+              v-for="reg in p.registrations.value"
               :key="reg.id"
               class="hover:bg-slate-50 transition-colors"
             >
               <td class="p-4 text-sm text-slate-600 whitespace-nowrap">
-                {{ formatDate(reg.created_at) }}
+                {{ p.formatDate(reg.created_at) }}
               </td>
               <td class="p-4">
                 <div class="font-medium text-slate-900">
@@ -296,37 +162,38 @@ onMounted(() => {
                 <span
                   v-if="reg.status === 'pending'"
                   class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
-                  >Menunggu ACC</span
                 >
+                  Menunggu ACC
+                </span>
                 <span
                   v-else-if="reg.status === 'approved'"
                   class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
-                  >Diterima</span
                 >
+                  Diterima
+                </span>
                 <span
                   v-else
                   class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800"
-                  >Ditolak</span
                 >
+                  Ditolak
+                </span>
               </td>
               <td class="p-4">
                 <div
                   class="flex gap-2 justify-center"
                   v-if="reg.status === 'pending'"
                 >
-                  <!-- Approve Btn -->
                   <button
-                    @click="approveTenant(reg.id, reg.store_name)"
-                    :disabled="processingId !== null"
+                    @click="p.approveTenant(reg.id, reg.store_name)"
+                    :disabled="p.processingId.value !== null"
                     class="flex-1 py-1.5 px-3 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Terima & Buat Akun"
                   >
                     Terima
                   </button>
-                  <!-- Reject Btn -->
                   <button
-                    @click="rejectTenant(reg.id, reg.store_name)"
-                    :disabled="processingId !== null"
+                    @click="p.rejectTenant(reg.id, reg.store_name)"
+                    :disabled="p.processingId.value !== null"
                     class="flex-1 py-1.5 px-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Tolak"
                   >

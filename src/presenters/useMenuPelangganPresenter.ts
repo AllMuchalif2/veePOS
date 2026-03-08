@@ -46,7 +46,7 @@ export function useMenuPelangganPresenter() {
 
     try {
       const { data: produkData, error } = await supabase
-        .from("produk")
+        .from("menu")
         .select("*")
         .eq("id_toko", idToko)
         .order("nama");
@@ -104,7 +104,7 @@ export function useMenuPelangganPresenter() {
       const details = cart.value.map((item) => ({
         id_pesanan: pesanan.id,
         id_toko: idToko,
-        id_produk: item.product.id,
+        id_menu: item.product.id,
         jumlah: item.qty,
         harga_satuan: item.product.harga,
         subtotal: item.qty * item.product.harga,

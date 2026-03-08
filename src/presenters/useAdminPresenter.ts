@@ -59,7 +59,7 @@ export function useAdminPresenter() {
       const [menuRes, mejaRes, kasirRes, incomeRes, weeklyIncomeRes] =
         await Promise.all([
           supabase
-            .from("produk")
+            .from("menu")
             .select("id", { count: "exact" })
             .eq("id_toko", profile.id_toko)
             .is("deleted_at", null),

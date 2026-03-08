@@ -62,7 +62,7 @@ export function useKasirPresenter() {
         tipe_pesanan: orderType.value,
         total_harga: totalCartAmount.value,
         items: cart.value.map((c) => ({
-          id_produk: c.product.id,
+          id_menu: c.product.id,
           jumlah: c.qty,
           harga_satuan: c.product.harga,
           subtotal: c.qty * c.product.harga,

@@ -19,6 +19,7 @@ export function getSupabaseAdmin() {
         autoRefreshToken: false,
         persistSession: false,
         detectSessionInUrl: false,
+        storageKey: "sb-admin-auth", // Unique key to avoid GoTrueClient conflict
       },
     });
   }
