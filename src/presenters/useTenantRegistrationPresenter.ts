@@ -51,7 +51,7 @@ export function useTenantRegistrationPresenter() {
     try {
       const tempPassword = "P" + Math.random().toString(36).slice(-8) + "!";
 
-      const { data, error } = await supabase.functions.invoke(
+      const { error } = await supabase.functions.invoke(
         "approve-tenant",
         {
           body: { 

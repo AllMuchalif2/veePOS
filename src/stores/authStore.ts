@@ -2,13 +2,15 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { supabase } from "../supabaseClient";
 
+import type { User } from "@supabase/supabase-js";
+
 export interface UserProfile {
   role: "superadmin" | "admin" | "kasir" | string;
   id_toko?: string | null;
 }
 
 export const useAuthStore = defineStore("auth", () => {
-  const user = ref(supabase.auth.getUser().then((res) => res.data.user));
+  const user = ref<User | null>(null);
   const profile = ref<UserProfile | null>(null);
 
   async function loadUser() {

@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
 import type { RouteRecordRaw } from "vue-router";
-import { supabase } from "../supabaseClient";
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -59,32 +58,27 @@ const router = createRouter({
 
 import { useAuthStore } from "../stores/authStore";
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const auth = useAuthStore();
   await auth.loadUser();
 
   const session = auth.user;
   const role = auth.profile?.role;
 
-  // redirect unauthenticated users
   if (to.meta.requiresAuth && !session) {
     return next({ name: "Login" });
   }
 
-  // already logged in, don't show login page
   if (to.name === "Login" && session) {
-    // choose destination based on role
     if (role === "superadmin") return next({ name: "SuperAdmin" });
     if (role === "admin") return next({ name: "AdminToko" });
     if (role === "kasir") return next({ name: "Kasir" });
     return next({ name: "Kasir" });
   }
 
-  // role guard
   const allowedRoles: string[] | undefined = to.meta.roles as any;
   if (allowedRoles && session) {
     if (!allowedRoles.includes(role || "")) {
-      // optionally redirect to a 403 page or home
       return next({ name: "Login" });
     }
   }

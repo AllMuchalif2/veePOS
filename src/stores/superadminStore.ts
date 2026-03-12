@@ -110,14 +110,13 @@ export const useSuperadminStore = defineStore("superadmin", () => {
   // Delete toko (soft delete)
   const deleteToko = async (id: string) => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("toko")
         .update({ deleted_at: new Date().toISOString() })
         .eq("id", id)
         .select()
         .single();
       if (error) throw error;
-      // Refresh list from server to ensure consistency
       await fetchToko();
     } catch (error) {
       throw error;
