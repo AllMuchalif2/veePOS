@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useKasirPresenter } from "../presenters/useKasirPresenter";
 
+const isCartMobileOpen = ref(false);
+
 const {
-  router,
   posStore,
   isInstallable,
   installApp,
@@ -30,7 +32,7 @@ const {
 
 <template>
   <div
-    class="h-screen flex flex-col md:flex-row bg-base overflow-hidden font-sans"
+    class="h-dvh flex bg-base overflow-hidden font-sans relative w-full"
   >
     <!-- Realtime Notifications Banner -->
     <div class="fixed top-4 right-4 z-50 flex flex-col gap-2">
@@ -45,25 +47,25 @@ const {
     </div>
 
     <!-- Main Content (Products) -->
-    <div class="flex-1 flex flex-col overflow-hidden relative">
+    <div class="flex-1 flex flex-col overflow-hidden relative w-full">
       <!-- Top Nav -->
       <header
-        class="bg-white px-6 py-4 flex justify-between items-center border-b border-gray-100 shrink-0"
+        class="bg-white px-4 md:px-6 py-3 md:py-4 flex flex-wrap gap-3 justify-between items-center border-b border-gray-100 shrink-0"
       >
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 md:gap-3">
           <div
-            class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center"
+            class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0"
           >
-            <i class="bx bx-store-alt text-xl"></i>
+            <i class="bx bx-store-alt text-lg md:text-xl"></i>
           </div>
-          <h1 class="text-xl font-bold text-gray-800">veePOS</h1>
+          <h1 class="text-lg md:text-xl font-bold text-gray-800 tracking-tight">veePOS</h1>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 md:gap-3 justify-end flex-wrap mt-2 sm:mt-0 lg:w-auto">
           <!-- Network Status Badge -->
           <div
             :class="[
-              'px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 transition-colors',
+              'px-2.5 md:px-3 py-1.5 rounded-full text-[10px] md:text-xs font-medium flex items-center gap-1.5 transition-colors',
               posStore.isOnline
                 ? 'bg-success/10 text-success'
                 : 'bg-danger/10 text-danger',
@@ -71,21 +73,21 @@ const {
           >
             <div
               :class="[
-                'w-2 h-2 rounded-full',
+                'w-1.5 h-1.5 md:w-2 md:h-2 rounded-full',
                 posStore.isOnline ? 'bg-success' : 'bg-danger',
               ]"
             ></div>
-            {{ posStore.isOnline ? "Online" : "Offline Mode" }}
+            {{ posStore.isOnline ? "Online" : "Offline" }}
           </div>
 
           <button
             v-if="isInstallable"
             @click="installApp"
-            class="text-sm font-medium bg-info hover:bg-info/80 text-white px-3 py-2 rounded-xl transition flex items-center gap-2 shadow-sm"
+            class="hidden sm:flex text-xs md:text-sm font-medium bg-info hover:bg-info/80 text-white px-3 py-1.5 md:py-2 rounded-xl transition items-center gap-1.5 md:gap-2 shadow-sm"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4"
+              class="h-4 w-4 shrink-0"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -95,18 +97,18 @@ const {
                 clip-rule="evenodd"
               />
             </svg>
-            Install App
+            Install
           </button>
 
           <button
             @click="goToDashboard()"
-            class="bg-secondary text-gray-800 px-4 py-2 rounded-xl hover:bg-[#c2aa96] transition shadow text-sm font-medium"
+            class="bg-secondary text-gray-800 px-3 md:px-4 py-1.5 md:py-2 rounded-xl hover:bg-[#c2aa96] transition shadow text-[10px] md:text-sm font-medium shrink-0"
           >
             Dashboard
           </button>
           <button
             @click="logout"
-            class="bg-primary text-white px-4 py-2 rounded-xl hover:bg-primary/80 transition shadow text-sm font-medium"
+            class="bg-primary text-white px-3 md:px-4 py-1.5 md:py-2 rounded-xl hover:bg-primary/80 transition shadow text-[10px] md:text-sm font-medium shrink-0"
           >
             Logout
           </button>
@@ -139,7 +141,7 @@ const {
       </div>
 
       <!-- Search & Category Filter -->
-      <div class="bg-white border-b border-gray-100 px-6 pt-4 pb-2 shrink-0">
+      <div class="bg-white border-b border-gray-100 px-4 md:px-6 pt-4 pb-2 shrink-0 relative z-10">
         <!-- Search Bar -->
         <div class="relative mb-3">
           <i
@@ -183,14 +185,14 @@ const {
       </div>
 
       <!-- Products Grid -->
-      <main class="flex-1 overflow-y-auto p-6">
+      <main class="flex-1 overflow-y-auto p-4 md:p-6 relative">
         <div v-if="posStore.isLoading" class="flex justify-center mt-12">
           <i class="bx bx-loader-alt bx-spin text-4xl text-primary"></i>
         </div>
 
         <div
           v-else
-          class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pb-24 md:pb-0"
+          class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 pb-28 md:pb-6"
         >
           <button
             v-for="p in filteredProducts"
@@ -237,15 +239,59 @@ const {
           </div>
         </div>
       </main>
+
+      <!-- Mobile Floating Cart Button -->
+      <div
+        v-if="cart.length > 0"
+        class="md:hidden absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[400px] bg-gray-900 border border-gray-800 text-white p-3 rounded-2xl shadow-2xl z-30 flex items-center justify-between font-sans transition-all duration-300 transform scale-100"
+      >
+        <div class="flex items-center gap-3 pl-1">
+          <div class="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center relative shrink-0">
+            <i class="bx bx-shopping-bag text-xl"></i>
+            <span class="absolute -top-1 -right-1 bg-primary text-white text-[10px] font-bold min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full border-2 border-gray-900 shadow-sm">
+              {{ cart.reduce((acc, item) => acc + item.qty, 0) }}
+            </span>
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[10px] text-gray-400 font-medium tracking-wide">Total Pesanan</span>
+            <span class="font-bold text-sm tracking-tight leading-none mt-0.5">Rp {{ totalCartAmount.toLocaleString("id-ID") }}</span>
+          </div>
+        </div>
+        
+        <button 
+          @click="isCartMobileOpen = true"
+          class="bg-primary hover:bg-[#c99188] px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-lg shadow-primary/20 flex items-center gap-1.5 active:scale-95 shrink-0"
+        >
+          Lihat <i class="bx bx-chevron-right text-lg -mr-1"></i>
+        </button>
+      </div>
     </div>
+
+    <!-- Mobile Cart Overlay -->
+    <div 
+      v-if="isCartMobileOpen" 
+      @click="isCartMobileOpen = false"
+      class="md:hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-40 transition-opacity"
+    ></div>
 
     <!-- Sidebar Cart -->
     <div
-      class="w-full md:w-96 bg-white border-l border-gray-100 flex flex-col relative z-20 shadow-[-10px_0_30px_rgb(0,0,0,0.02)] shrink-0 h-[60vh] md:h-screen mt-auto md:mt-0"
+      :class="[
+        'w-full max-w-[420px] md:max-w-none md:w-96 bg-white border-l border-gray-100 flex flex-col fixed md:relative z-50 shadow-2xl md:shadow-[-10px_0_30px_rgb(0,0,0,0.02)] shrink-0 h-dvh top-0 right-0 transition-transform duration-300 ease-in-out',
+        isCartMobileOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
+      ]"
     >
       <!-- Cart Header -->
-      <div class="p-6 border-b border-gray-100 shrink-0">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Current Order</h2>
+      <div class="p-4 md:p-6 border-b border-gray-100 shrink-0 relative">
+        <div class="flex justify-between items-center mb-4 md:mb-5">
+          <h2 class="text-xl font-bold text-gray-800">Current Order</h2>
+          <button 
+            @click="isCartMobileOpen = false"
+            class="md:hidden w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+          >
+            <i class="bx bx-x text-xl"></i>
+          </button>
+        </div>
 
         <div class="space-y-3">
           <div class="flex gap-2">
