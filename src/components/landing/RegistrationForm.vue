@@ -127,9 +127,16 @@
               />
             </div>
 
+            <div>
+              <div ref="captchaRef" class="min-h-16"></div>
+              <p v-if="captchaError" class="mt-1 text-xs text-danger">
+                {{ captchaError }}
+              </p>
+            </div>
+
             <button
               type="submit"
-              :disabled="isSubmitting"
+              :disabled="isSubmitting || !captchaToken"
               class="w-full bg-primary hover-bg-primary text-white font-semibold py-3 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6"
             >
               <svg
@@ -166,7 +173,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { supabase } from "../../supabaseClient";
 
 const form = ref({
@@ -178,33 +185,102 @@ const form = ref({
 const isSubmitting = ref(false);
 const successMsg = ref("");
 const errorMsg = ref("");
+const captchaRef = ref<HTMLElement | null>(null);
+const captchaToken = ref("");
+const captchaError = ref("");
+const turnstileWidgetId = ref<string | null>(null);
+
+const renderCaptcha = () => {
+  const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  if (!siteKey) {
+    captchaError.value = "Captcha key belum dikonfigurasi.";
+    return;
+  }
+
+  if (!captchaRef.value || !window.turnstile || turnstileWidgetId.value) return;
+
+  turnstileWidgetId.value = window.turnstile.render(captchaRef.value, {
+    sitekey: siteKey,
+    theme: "light",
+    callback: (token: string) => {
+      captchaToken.value = token;
+      captchaError.value = "";
+    },
+    "expired-callback": () => {
+      captchaToken.value = "";
+      captchaError.value = "Captcha kedaluwarsa. Silakan verifikasi ulang.";
+    },
+    "error-callback": () => {
+      captchaToken.value = "";
+      captchaError.value = "Captcha gagal dimuat. Coba refresh halaman.";
+    },
+  });
+};
+
+onMounted(() => {
+  const tryRender = () => {
+    renderCaptcha();
+    if (!turnstileWidgetId.value) {
+      setTimeout(tryRender, 250);
+    }
+  };
+  tryRender();
+});
 
 const submitRegistration = async () => {
   if (!form.value.storeName || !form.value.email || !form.value.phone) return;
+  if (!captchaToken.value) {
+    captchaError.value = "Silakan selesaikan captcha terlebih dahulu.";
+    return;
+  }
 
   isSubmitting.value = true;
   successMsg.value = "";
   errorMsg.value = "";
 
   try {
-    const { error } = await supabase.from("tenant_registrations").insert([
+    const normalizedStoreName = form.value.storeName.trim();
+    const normalizedEmail = form.value.email.trim().toLowerCase();
+    const normalizedPhone = form.value.phone.trim();
+
+    const { error } = await supabase.functions.invoke(
+      "submit-tenant-registration",
       {
-        store_name: form.value.storeName,
-        email: form.value.email,
-        phone: form.value.phone,
-        status: "pending", // Default dari database, dikirim eksplisit sebagai pengingat
+        body: {
+          storeName: normalizedStoreName,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          captchaToken: captchaToken.value,
+        },
       },
-    ]);
+    );
 
     if (error) {
       console.error("Gagal mendaftar:", error);
-      errorMsg.value = "Terjadi kesalahan saat pendaftaran. Silakan coba lagi.";
+      const message = (error.message || "").toLowerCase();
+
+      if (message.includes("pending") || message.includes("sudah")) {
+        errorMsg.value =
+          "Email atau nomor ini masih dalam antrean verifikasi. Mohon tunggu proses sebelumnya.";
+      } else if (message.includes("terlalu banyak") || message.includes("lalu lintas")) {
+        errorMsg.value =
+          "Pendaftaran dibatasi untuk mencegah spam. Coba lagi beberapa saat.";
+      } else if (message.includes("captcha")) {
+        errorMsg.value = "Verifikasi captcha gagal. Silakan coba lagi.";
+      } else {
+        errorMsg.value = "Terjadi kesalahan saat pendaftaran. Silakan coba lagi.";
+      }
       return;
     }
 
     successMsg.value =
       "Hore! Pendaftaran Anda berhasil. Tim kami akan segera menghubungi Anda melalui WhatsApp/Email.";
     form.value = { storeName: "", email: "", phone: "" };
+    captchaToken.value = "";
+    captchaError.value = "";
+    if (window.turnstile && turnstileWidgetId.value) {
+      window.turnstile.reset(turnstileWidgetId.value);
+    }
   } catch (err: any) {
     errorMsg.value = err.message || "Terjadi kesalahan sistem";
   } finally {

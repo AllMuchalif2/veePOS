@@ -1,2 +1,5 @@
 [functions.approve-tenant]
 verify_jwt = false
+
+[functions.submit-tenant-registration]
+verify_jwt = false
