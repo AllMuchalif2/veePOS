@@ -52,8 +52,8 @@ export function useKasirDashboardPresenter() {
   );
 
   const fetchRingkasan = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
+    await auth.loadUser();
+    if (!auth.user) return;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -63,7 +63,7 @@ export function useKasirDashboardPresenter() {
       .select(
         "id, nomor_pesanan, nama_pelanggan, tipe_pesanan, metode_pembayaran, total_harga, created_at",
       )
-      .eq("id_kasir", userData.user.id)
+      .eq("id_kasir", auth.user.id)
       .gte("created_at", today.toISOString())
       .is("deleted_at", null)
       .order("created_at", { ascending: false });

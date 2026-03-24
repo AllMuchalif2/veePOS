@@ -3,6 +3,7 @@ import { supabase } from "../supabaseClient";
 import { useRouter } from "vue-router";
 import { type Produk } from "../stores/posStore";
 import { usePwaInstall } from "../composables/usePwaInstall";
+import { useAuthStore } from "../stores/authStore";
 
 export function useAdminPresenter() {
   const router = useRouter();
@@ -35,14 +36,10 @@ export function useAdminPresenter() {
   const loadDashboardData = async () => {
     loading.value = true;
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
 
-      if (!profile?.id_toko) return;
+      if (!tokoId) return;
 
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
@@ -56,29 +53,29 @@ export function useAdminPresenter() {
           supabase
             .from("menu")
             .select("id", { count: "exact" })
-            .eq("id_toko", profile.id_toko)
+            .eq("id_toko", tokoId)
             .is("deleted_at", null),
           supabase
             .from("meja")
             .select("id", { count: "exact" })
-            .eq("id_toko", profile.id_toko)
+            .eq("id_toko", tokoId)
             .is("deleted_at", null),
           supabase
             .from("user_profiles")
             .select("id", { count: "exact" })
-            .eq("id_toko", profile.id_toko)
+            .eq("id_toko", tokoId)
             .eq("role", "kasir")
             .is("deleted_at", null),
           supabase
             .from("pesanan")
             .select("total_harga")
-            .eq("id_toko", profile.id_toko)
+            .eq("id_toko", tokoId)
             .eq("status", "selesai")
             .gte("created_at", startOfToday.toISOString()),
           supabase
             .from("pesanan")
             .select("total_harga, created_at")
-            .eq("id_toko", profile.id_toko)
+            .eq("id_toko", tokoId)
             .eq("status", "selesai")
             .gte("created_at", startOf7DaysAgo.toISOString()),
         ]);
@@ -132,7 +129,7 @@ export function useAdminPresenter() {
         };
       }
 
-      await refreshProducts(profile.id_toko);
+      await refreshProducts(tokoId);
     } catch (error) {
       console.error("Error loading dashboard data", error);
     } finally {
@@ -144,13 +141,8 @@ export function useAdminPresenter() {
     try {
       let tokoId = idToko;
       if (!tokoId) {
-        const { data: userData } = await supabase.auth.getUser();
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("id_toko")
-          .eq("id", userData.user?.id)
-          .single();
-        tokoId = profile?.id_toko;
+        const authStore = useAuthStore();
+        tokoId = authStore.profile?.id_toko ?? undefined;
       }
       if (!tokoId) return;
 

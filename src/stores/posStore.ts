@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import localforage from "localforage";
 import { supabase } from "../supabaseClient";
+import { useAuthStore } from "./authStore";
 
 export interface Kategori {
   id: string;
@@ -70,15 +71,10 @@ export const usePosStore = defineStore("pos", () => {
     try {
       if (isOnline.value) {
         // Get current user's toko first
-        const { data: userData } = await supabase.auth.getUser();
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("id_toko")
-          .eq("id", userData.user?.id)
-          .single();
+        const authStore = useAuthStore();
+        const idToko = authStore.profile?.id_toko;
 
-        if (!profile?.id_toko) throw new Error("Profil toko tidak ditemukan");
-        const idToko = profile.id_toko;
+        if (!idToko) throw new Error("Profil toko tidak ditemukan");
 
         // Fetch only this store's data
         const [catRes, prodRes, tableRes] = await Promise.all([
@@ -168,57 +164,33 @@ export const usePosStore = defineStore("pos", () => {
   // Actual Supabase submission logic inside RPC or individual tables
   const sendOrderToSupabase = async (order: PendingOrder) => {
     try {
-      // Get current user's id_toko
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error("Not logged in");
+      // Get current user's id_toko and id_kasir
+      const authStore = useAuthStore();
+      const idKasir = authStore.user?.id;
+      const idToko = authStore.profile?.id_toko;
 
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user.id)
-        .single();
-      if (!profile) throw new Error("Profile not found");
+      if (!idKasir || !idToko) throw new Error("Auth/Profile not found");
 
-      // Insert Pesanan
-      const { data: pesanan, error: pesananErr } = await supabase
-        .from("pesanan")
-        .insert({
-          id_toko: profile.id_toko,
-          id_meja: order.id_meja,
-          nama_pelanggan: order.nama_pelanggan,
-          tipe_pesanan: order.tipe_pesanan,
-          total_harga: order.total_harga,
-          metode_pembayaran: order.metode_pembayaran ?? null,
-          status: "selesai",
-          nomor_pesanan: `INV-${Date.now()}`,
-          id_kasir: userData.user.id,
-        })
-        .select()
-        .single();
+      const payload = {
+        p_id_toko: idToko,
+        p_id_meja: order.id_meja,
+        p_nama_pelanggan: order.nama_pelanggan,
+        p_tipe_pesanan: order.tipe_pesanan,
+        p_total_harga: order.total_harga,
+        p_metode_pembayaran: order.metode_pembayaran ?? null,
+        p_id_kasir: idKasir,
+        p_items: order.items,
+      };
 
-      if (pesananErr) throw pesananErr;
+      const { data, error } = await supabase.rpc("submit_order", payload);
 
-      // Insert Detail Pesanan
-      const details = order.items.map((item) => ({
-        id_pesanan: pesanan.id,
-        id_toko: profile.id_toko,
-        id_menu: item.id_menu,
-        jumlah: item.jumlah,
-        harga_satuan: item.harga_satuan,
-        subtotal: item.subtotal,
-      }));
+      if (error) throw error;
+      if (!data.success) throw new Error("RPC transaction failed");
 
-      const { error: detailErr } = await supabase
-        .from("detail_pesanan")
-        .insert(details);
-      if (detailErr) throw detailErr;
-
-      // Update status meja → 'terisi' jika dine_in
+      // Update local meja status for immediate reactivity
       if (order.tipe_pesanan === "dine_in" && order.id_meja) {
-        await supabase
-          .from("meja")
-          .update({ status: "terisi" })
-          .eq("id", order.id_meja);
+        const table = tables.value.find((t) => t.id === order.id_meja);
+        if (table) table.status = "terisi";
       }
 
       return { success: true, offline: false };

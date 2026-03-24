@@ -1,6 +1,7 @@
 import { ref, onMounted } from "vue";
 import { supabase } from "../supabaseClient";
 import { swalSuccess, swalError, swalConfirm } from "./useSwal";
+import { useAuthStore } from "../stores/authStore";
 
 export interface AkunKasir {
   id: string;
@@ -20,19 +21,15 @@ export function useAdminKasirTab() {
   const loadKasir = async () => {
     loading.value = true;
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
 
-      if (!profile?.id_toko) throw new Error("Profil toko tidak ditemukan");
+      if (!tokoId) throw new Error("Profil toko tidak ditemukan");
 
       const { data, error } = await supabase
         .from("user_profiles")
         .select("id, nama, email, created_at")
-        .eq("id_toko", profile.id_toko)
+        .eq("id_toko", tokoId)
         .eq("role", "kasir")
         .is("deleted_at", null)
         .order("created_at", { ascending: false });

@@ -3,6 +3,7 @@ import { supabase } from "../supabaseClient";
 import { type Produk } from "../stores/posStore";
 import { useImageUpload } from "./useImageUpload";
 import { swalSuccess, swalError, swalConfirm } from "./useSwal";
+import { useAuthStore } from "../stores/authStore";
 
 export interface KategoriItem {
   id: string;
@@ -29,19 +30,15 @@ export function useAdminMenuTab(onRefresh: () => void) {
 
   const loadKategori = async () => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
 
-      if (!profile?.id_toko) return;
+      if (!tokoId) return;
 
       const { data } = await supabase
         .from("kategori")
         .select("id, nama")
-        .eq("id_toko", profile.id_toko)
+        .eq("id_toko", tokoId)
         .is("deleted_at", null)
         .order("nama");
 
@@ -112,12 +109,8 @@ export function useAdminMenuTab(onRefresh: () => void) {
         if (uploadError.value) throw new Error(uploadError.value);
       }
 
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
 
       if (isEditing.value && editingId.value) {
         const { error } = await supabase
@@ -133,7 +126,7 @@ export function useAdminMenuTab(onRefresh: () => void) {
         await swalSuccess("Berhasil", "Menu berhasil diperbarui");
       } else {
         const { error } = await supabase.from("menu").insert({
-          id_toko: profile?.id_toko,
+          id_toko: tokoId,
           id_kategori: newProduct.value.id_kategori,
           nama: newProduct.value.nama,
           harga: newProduct.value.harga,

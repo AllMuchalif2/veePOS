@@ -1,6 +1,7 @@
 import { ref, onMounted } from "vue";
 import { supabase } from "../supabaseClient";
 import { swalSuccess, swalError } from "./useSwal";
+import { useAuthStore } from "../stores/authStore";
 
 export interface TokoData {
   id: string;
@@ -16,19 +17,15 @@ export function useAdminPengaturanTab() {
   const loadToko = async () => {
     loading.value = true;
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
 
-      if (!profile?.id_toko) throw new Error("Profil toko tidak ditemukan");
+      if (!tokoId) throw new Error("Profil toko tidak ditemukan");
 
       const { data, error } = await supabase
         .from("toko")
         .select("id, nama_toko")
-        .eq("id", profile.id_toko)
+        .eq("id", tokoId)
         .single();
 
       if (error) throw error;

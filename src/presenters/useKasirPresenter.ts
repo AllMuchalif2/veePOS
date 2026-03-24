@@ -153,15 +153,8 @@ export function useKasirPresenter() {
   };
 
   const setupRealtime = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
-
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("id_toko")
-      .eq("id", userData.user.id)
-      .single();
-    if (!profile) return;
+    const tokoId = auth.profile?.id_toko;
+    if (!tokoId) return;
 
     pesananSubscription = supabase
       .channel("public:pesanan")
@@ -171,7 +164,7 @@ export function useKasirPresenter() {
           event: "INSERT",
           schema: "public",
           table: "pesanan",
-          filter: `id_toko=eq.${profile.id_toko}`,
+          filter: `id_toko=eq.${tokoId}`,
         },
         (payload) => {
           if (payload.new.status === "pending") {

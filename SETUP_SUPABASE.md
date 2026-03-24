@@ -28,8 +28,8 @@ Deploy function registrasi:
 supabase functions deploy submit-tenant-registration
 ```
 
-## 3) Terapkan RLS policy baseline
-Buka file `supabase/rls_policies.sql`, copy semua isi, lalu jalankan di Supabase SQL Editor.
+## 3) Terapkan Skema Database & RLS Policy
+Jika database Anda baru di-setup, buka file `db/schema.sql`, copy semua isinya, lalu jalankan di menu SQL Editor pada Dashboard Supabase Anda untuk membentuk tabel, fungsi, dan keamanan (RLS).
 
 ## 4) Verifikasi RLS sudah sinkron
 Jalankan query ini di SQL Editor:
@@ -41,7 +41,7 @@ where schemaname='public'
 order by tablename, policyname;
 ```
 
-Bandingkan hasilnya dengan policy yang ada di `supabase/rls_policies.sql`.
+Bandingkan hasilnya dengan kumpulan `CREATE POLICY` yang tertua di dalam file `db/schema.sql`.
 
 ## 5) Verifikasi captcha flow
 - Buka landing page.

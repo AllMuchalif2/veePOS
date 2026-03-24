@@ -49,6 +49,11 @@ const routes: Array<RouteRecordRaw> = [
     name: "MenuPelangganSlug",
     component: () => import("../views/MenuPelanggan.vue"),
   },
+  {
+    path: "/:pathMatch(.*)*",
+    name: "NotFound",
+    component: () => import("../views/NotFound.vue"),
+  },
 ];
 
 const router = createRouter({

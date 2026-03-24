@@ -1,6 +1,7 @@
 import { ref, onMounted } from "vue";
 import { supabase } from "../supabaseClient";
 import { swalSuccess, swalError, swalConfirm } from "./useSwal";
+import { useAuthStore } from "../stores/authStore";
 
 export interface Kategori {
   id: string;
@@ -18,19 +19,15 @@ export function useAdminKategoriTab() {
   const loadKategori = async () => {
     loading.value = true;
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
 
-      if (!profile?.id_toko) throw new Error("Profil toko tidak ditemukan");
+      if (!tokoId) throw new Error("Profil toko tidak ditemukan");
 
       const { data, error } = await supabase
         .from("kategori")
         .select("*")
-        .eq("id_toko", profile.id_toko)
+        .eq("id_toko", tokoId)
         .is("deleted_at", null)
         .order("nama");
 
@@ -60,12 +57,8 @@ export function useAdminKategoriTab() {
     formLoading.value = true;
 
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
 
       if (isEditing.value) {
         const { error } = await supabase
@@ -76,7 +69,7 @@ export function useAdminKategoriTab() {
         await swalSuccess("Berhasil", "Data kategori diperbarui");
       } else {
         const { error } = await supabase.from("kategori").insert({
-          id_toko: profile?.id_toko,
+          id_toko: tokoId,
           nama: form.value.nama,
         });
         if (error) throw error;

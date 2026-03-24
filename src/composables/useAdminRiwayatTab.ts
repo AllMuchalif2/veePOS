@@ -1,6 +1,7 @@
 import { ref, onMounted } from "vue";
 import { supabase } from "../supabaseClient";
 import { swalError } from "./useSwal";
+import { useAuthStore } from "../stores/authStore";
 
 export interface DetailPesanan {
   id: string;
@@ -33,14 +34,10 @@ export function useAdminRiwayatTab() {
   const loadRiwayat = async () => {
     loading.value = true;
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
 
-      if (!profile?.id_toko) return;
+      if (!tokoId) return;
 
       const startOfDay = new Date(filterDate.value);
       startOfDay.setHours(0, 0, 0, 0);
@@ -54,7 +51,7 @@ export function useAdminRiwayatTab() {
           meja:id_meja(nomor_meja),
           kasir:id_kasir(nama)`,
         )
-        .eq("id_toko", profile.id_toko)
+        .eq("id_toko", tokoId)
         .gte("created_at", startOfDay.toISOString())
         .lte("created_at", endOfDay.toISOString())
         .order("created_at", { ascending: false });

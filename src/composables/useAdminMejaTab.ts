@@ -3,6 +3,7 @@ import { supabase } from "../supabaseClient";
 import { swalSuccess, swalError, swalConfirm } from "./useSwal";
 import QRCode from "qrcode";
 import { slugify } from "./useSlugify";
+import { useAuthStore } from "../stores/authStore";
 
 export interface Meja {
   id: string;
@@ -28,18 +29,14 @@ export function useAdminMejaTab() {
 
   const loadNamaToko = async () => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
-      if (!profile?.id_toko) return;
-      idToko.value = profile.id_toko;
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
+      if (!tokoId) return;
+      idToko.value = tokoId;
       const { data: toko } = await supabase
         .from("toko")
         .select("nama_toko, slug")
-        .eq("id", profile.id_toko)
+        .eq("id", tokoId)
         .single();
       if (toko) {
         namaToko.value = toko.nama_toko;
@@ -53,19 +50,15 @@ export function useAdminMejaTab() {
   const loadMeja = async () => {
     loading.value = true;
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
 
-      if (!profile?.id_toko) throw new Error("Profil toko tidak ditemukan");
+      if (!tokoId) throw new Error("Profil toko tidak ditemukan");
 
       const { data, error } = await supabase
         .from("meja")
         .select("*")
-        .eq("id_toko", profile.id_toko)
+        .eq("id_toko", tokoId)
         .is("deleted_at", null)
         .order("nomor_meja");
 
@@ -95,12 +88,8 @@ export function useAdminMejaTab() {
     formLoading.value = true;
 
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("id_toko")
-        .eq("id", userData.user?.id)
-        .single();
+      const authStore = useAuthStore();
+      const tokoId = authStore.profile?.id_toko;
 
       if (isEditing.value) {
         const { error } = await supabase
@@ -115,7 +104,7 @@ export function useAdminMejaTab() {
         await swalSuccess("Berhasil", "Data meja diperbarui");
       } else {
         const { error } = await supabase.from("meja").insert({
-          id_toko: profile?.id_toko,
+          id_toko: tokoId,
           nomor_meja: form.value.nomor_meja,
           slug: slugify(form.value.nomor_meja),
           status: form.value.status,

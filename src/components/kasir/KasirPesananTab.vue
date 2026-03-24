@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue";
 import { supabase } from "../../supabaseClient";
 import { swalError } from "../../composables/useSwal";
+import { useAuthStore } from "../../stores/authStore";
 
 interface Pesanan {
   id: string;
@@ -41,13 +42,9 @@ const getLabel = (status: string) =>
 const loadPesanan = async () => {
   loading.value = true;
   try {
-    const { data: userData } = await supabase.auth.getUser();
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("id_toko")
-      .eq("id", userData.user?.id)
-      .single();
-    if (!profile?.id_toko) return;
+    const authStore = useAuthStore();
+    const tokoId = authStore.profile?.id_toko;
+    if (!tokoId) return;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -57,7 +54,7 @@ const loadPesanan = async () => {
       .select(
         "id, nomor_pesanan, nama_pelanggan, status, total_harga, tipe_pesanan, created_at",
       )
-      .eq("id_toko", profile.id_toko)
+      .eq("id_toko", tokoId)
       .gte("created_at", today.toISOString())
       .order("created_at", { ascending: false });
 
