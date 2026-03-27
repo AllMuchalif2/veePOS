@@ -239,6 +239,62 @@ export const usePosStore = defineStore("pos", () => {
     isSyncing.value = false;
   };
 
+  const fetchOrderDetails = async (orderId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("detail_pesanan")
+        .select(`
+          *,
+          menu:id_menu(nama, foto_url)
+        `)
+        .eq("id_pesanan", orderId)
+        .order("created_at");
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error fetching order details:", error);
+      return [];
+    }
+  };
+
+  const markItemAsEmpty = async (detailId: string) => {
+    try {
+      const { data, error } = await supabase.rpc("handle_item_unavailable", {
+        p_detail_id: detailId,
+      });
+
+      if (error) throw error;
+      
+      await fetchMenu();
+      return data;
+    } catch (error) {
+      console.error("Error marking item as empty:", error);
+      throw error;
+    }
+  };
+
+  const addItemToOrder = async (orderId: string, menuId: string, jumlah: number) => {
+    try {
+      const authStore = useAuthStore();
+      const idToko = authStore.profile?.id_toko;
+      if (!idToko) throw new Error("Toko ID not found");
+
+      const { data, error } = await supabase.rpc("add_item_to_order", {
+        p_order_id: orderId,
+        p_menu_id: menuId,
+        p_jumlah: jumlah,
+        p_id_toko: idToko
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error adding item to order:", error);
+      throw error;
+    }
+  };
+
   return {
     categories,
     products,
@@ -251,5 +307,8 @@ export const usePosStore = defineStore("pos", () => {
     loadPendingOrders,
     submitOrder,
     syncPendingOrders,
+    fetchOrderDetails,
+    markItemAsEmpty,
+    addItemToOrder,
   };
 });
