@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4k9AbdOl8aeRCHzNrCCRWA5gZpfYnp1Pb1hmL4SpUlA4CHT0OmS8bGkfu6l1W3B
+\restrict kBgL2PdbfsPn92CJbMfcsh2DKouGeEcdpudSytqRUpqtv9XIoWeVC9f2BS3r65r
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.1
@@ -34,6 +34,57 @@ ALTER SCHEMA public OWNER TO pg_database_owner;
 
 COMMENT ON SCHEMA public IS 'standard public schema';
 
+
+--
+-- Name: add_item_to_order(uuid, uuid, integer, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.add_item_to_order(p_order_id uuid, p_menu_id uuid, p_jumlah integer, p_id_toko uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+  v_harga numeric;
+  v_subtotal numeric;
+  v_existing_id uuid;
+BEGIN
+  -- 1. Ambil harga menu terbaru
+  SELECT harga INTO v_harga FROM public.menu WHERE id = p_menu_id;
+  
+  IF v_harga IS NULL THEN
+     RETURN jsonb_build_object('success', false, 'message', 'Menu tidak ditemukan');
+  END IF;
+
+  v_subtotal := v_harga * p_jumlah;
+
+  -- 2. Cek apakah menu yang sama sudah ada di pesanan ini (dan statusnya masih tersedia)
+  SELECT id INTO v_existing_id 
+  FROM public.detail_pesanan 
+  WHERE id_pesanan = p_order_id 
+    AND id_menu = p_menu_id 
+    AND status = 'tersedia'
+  LIMIT 1;
+
+  IF v_existing_id IS NOT NULL THEN
+    -- Jika sudah ada, tambahkan jumlahnya saja (Grouping)
+    UPDATE public.detail_pesanan 
+    SET jumlah = jumlah + p_jumlah,
+        subtotal = subtotal + v_subtotal
+    WHERE id = v_existing_id;
+  ELSE
+    -- Jika belum ada, baru pindah ke baris baru
+    INSERT INTO public.detail_pesanan (id_pesanan, id_toko, id_menu, jumlah, harga_satuan, subtotal)
+    VALUES (p_order_id, p_id_toko, p_menu_id, p_jumlah, v_harga, v_subtotal);
+  END IF;
+
+  -- 3. Update total_harga di pesanan induk
+  UPDATE public.pesanan SET total_harga = total_harga + v_subtotal WHERE id = p_order_id;
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$;
+
+
+ALTER FUNCTION public.add_item_to_order(p_order_id uuid, p_menu_id uuid, p_jumlah integer, p_id_toko uuid) OWNER TO postgres;
 
 --
 -- Name: can_submit_tenant_registration(text, text); Type: FUNCTION; Schema: public; Owner: postgres
@@ -115,6 +166,45 @@ $$;
 ALTER FUNCTION public.generate_slug(t text) OWNER TO postgres;
 
 --
+-- Name: handle_item_unavailable(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.handle_item_unavailable(p_detail_id uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+  v_pesanan_id uuid;
+  v_menu_id uuid;
+  v_subtotal numeric;
+BEGIN
+  -- Ambil info detail
+  SELECT id_pesanan, id_menu, subtotal 
+  INTO v_pesanan_id, v_menu_id, v_subtotal
+  FROM public.detail_pesanan 
+  WHERE id = p_detail_id;
+
+  -- Jika sudah kosong, abaikan
+  IF (SELECT status FROM public.detail_pesanan WHERE id = p_detail_id) = 'kosong' THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Item sudah ditandai kosong');
+  END IF;
+
+  -- Update status detail_pesanan
+  UPDATE public.detail_pesanan SET status = 'kosong' WHERE id = p_detail_id;
+
+  -- Kurangi total_harga di pesanan
+  UPDATE public.pesanan SET total_harga = total_harga - v_subtotal WHERE id = v_pesanan_id;
+
+  -- Matikan ketersediaan menu agar tidak dipesan orang lain
+  UPDATE public.menu SET tersedia = false WHERE id = v_menu_id;
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$;
+
+
+ALTER FUNCTION public.handle_item_unavailable(p_detail_id uuid) OWNER TO postgres;
+
+--
 -- Name: normalize_phone(text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -140,48 +230,26 @@ DECLARE
   v_nomor_pesanan TEXT;
   v_item JSONB;
 BEGIN
-  -- Generate nomor_pesanan based on timestamp
+  -- Generate nomor_pesanan
   v_nomor_pesanan := 'INV-' || (extract(epoch from now()) * 1000)::bigint::text;
 
-  -- 1. Insert pesanan
+  -- 1. Insert pesanan dengan status 'diproses' (BUKAN 'selesai')
   INSERT INTO pesanan (
-    id_toko, 
-    id_meja, 
-    nama_pelanggan, 
-    tipe_pesanan, 
-    total_harga, 
-    metode_pembayaran, 
-    status, 
-    nomor_pesanan, 
-    id_kasir
+    id_toko, id_meja, nama_pelanggan, tipe_pesanan, total_harga, 
+    metode_pembayaran, status, nomor_pesanan, id_kasir
   ) VALUES (
-    p_id_toko, 
-    p_id_meja, 
-    p_nama_pelanggan, 
-    p_tipe_pesanan, 
-    p_total_harga, 
-    p_metode_pembayaran, 
-    'selesai', 
-    v_nomor_pesanan, 
-    p_id_kasir
+    p_id_toko, p_id_meja, p_nama_pelanggan, p_tipe_pesanan, p_total_harga, 
+    p_metode_pembayaran, 'diproses', v_nomor_pesanan, p_id_kasir
   ) RETURNING id INTO v_id_pesanan;
 
   -- 2. Insert detail_pesanan
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
   LOOP
     INSERT INTO detail_pesanan (
-      id_pesanan, 
-      id_toko, 
-      id_menu, 
-      jumlah, 
-      harga_satuan, 
-      subtotal
+      id_pesanan, id_toko, id_menu, jumlah, harga_satuan, subtotal
     ) VALUES (
-      v_id_pesanan,
-      p_id_toko,
-      (v_item->>'id_menu')::UUID,
-      (v_item->>'jumlah')::INT,
-      (v_item->>'harga_satuan')::NUMERIC,
+      v_id_pesanan, p_id_toko, (v_item->>'id_menu')::UUID, 
+      (v_item->>'jumlah')::INT, (v_item->>'harga_satuan')::NUMERIC, 
       (v_item->>'subtotal')::NUMERIC
     );
   END LOOP;
@@ -191,7 +259,6 @@ BEGIN
     UPDATE meja SET status = 'terisi' WHERE id = p_id_meja;
   END IF;
 
-  -- Return success and generated ID
   RETURN jsonb_build_object(
     'success', true, 
     'id_pesanan', v_id_pesanan,
@@ -220,7 +287,8 @@ CREATE TABLE public.detail_pesanan (
     harga_satuan numeric(12,2) NOT NULL,
     subtotal numeric(12,2) NOT NULL,
     deleted_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    status text DEFAULT 'tersedia'::text
 );
 
 
@@ -944,6 +1012,15 @@ GRANT USAGE ON SCHEMA public TO service_role;
 
 
 --
+-- Name: FUNCTION add_item_to_order(p_order_id uuid, p_menu_id uuid, p_jumlah integer, p_id_toko uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.add_item_to_order(p_order_id uuid, p_menu_id uuid, p_jumlah integer, p_id_toko uuid) TO anon;
+GRANT ALL ON FUNCTION public.add_item_to_order(p_order_id uuid, p_menu_id uuid, p_jumlah integer, p_id_toko uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.add_item_to_order(p_order_id uuid, p_menu_id uuid, p_jumlah integer, p_id_toko uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION can_submit_tenant_registration(in_email text, in_phone text); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -968,6 +1045,15 @@ GRANT ALL ON FUNCTION public.current_user_is_superadmin() TO service_role;
 GRANT ALL ON FUNCTION public.generate_slug(t text) TO anon;
 GRANT ALL ON FUNCTION public.generate_slug(t text) TO authenticated;
 GRANT ALL ON FUNCTION public.generate_slug(t text) TO service_role;
+
+
+--
+-- Name: FUNCTION handle_item_unavailable(p_detail_id uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.handle_item_unavailable(p_detail_id uuid) TO anon;
+GRANT ALL ON FUNCTION public.handle_item_unavailable(p_detail_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.handle_item_unavailable(p_detail_id uuid) TO service_role;
 
 
 --
@@ -1124,5 +1210,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4k9AbdOl8aeRCHzNrCCRWA5gZpfYnp1Pb1hmL4SpUlA4CHT0OmS8bGkfu6l1W3B
+\unrestrict kBgL2PdbfsPn92CJbMfcsh2DKouGeEcdpudSytqRUpqtv9XIoWeVC9f2BS3r65r
 

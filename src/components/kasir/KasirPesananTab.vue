@@ -4,10 +4,27 @@ import { supabase } from "../../supabaseClient";
 import { swalError } from "../../composables/useSwal";
 import { useAuthStore } from "../../stores/authStore";
 import { usePosStore } from "../../stores/posStore";
+import { useExportExcel } from "../../composables/useExportExcel";
 import OrderDetailModal from "../shared/OrderDetailModal.vue";
 
 const posStore = usePosStore();
+const authStore = useAuthStore();
+const { exportToExcel } = useExportExcel();
 
+const exporting = ref(false);
+
+const handleExport = async () => {
+  const tokoId = authStore.profile?.id_toko;
+  if (!tokoId) return;
+
+  exporting.value = true;
+  // For cashier, we export specifically for today
+  await exportToExcel(tokoId, {
+    mode: "day",
+    date: new Date().toISOString().split("T")[0],
+  });
+  exporting.value = false;
+};
 
 interface Pesanan {
   id: string;
@@ -26,8 +43,6 @@ const filterStatus = ref("pending");
 // Detail Modal State
 const showDetailModal = ref(false);
 const selectedPesanan = ref<Pesanan | null>(null);
-
-
 
 const statusOptions = [
   {
@@ -53,7 +68,6 @@ const getLabel = (status: string) =>
 const loadPesanan = async () => {
   loading.value = true;
   try {
-    const authStore = useAuthStore();
     const tokoId = authStore.profile?.id_toko;
     if (!tokoId) return;
 
@@ -109,8 +123,6 @@ const handleUpdate = () => {
   }
 };
 
-
-
 onMounted(async () => {
   await loadPesanan();
   await posStore.fetchMenu();
@@ -149,6 +161,15 @@ onMounted(async () => {
           title="Refresh"
         >
           <i class="bx bx-refresh text-lg leading-none"></i>
+        </button>
+        <button
+          @click="handleExport"
+          :disabled="exporting || pesananList.length === 0"
+          class="flex items-center gap-2 px-3 py-2 bg-success text-white rounded-xl text-xs font-bold hover:bg-success/90 transition-all active:scale-95 disabled:opacity-50"
+        >
+          <i v-if="exporting" class="bx bx-loader-alt bx-spin"></i>
+          <i v-else class="bx bx-spreadsheet"></i>
+          <span>Ekspor</span>
         </button>
       </div>
     </div>

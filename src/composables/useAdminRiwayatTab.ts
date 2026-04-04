@@ -26,9 +26,12 @@ export interface Pesanan {
 }
 
 export function useAdminRiwayatTab() {
-  const riwayat = ref<Pesanan[]>([]);
+  const riwayat = ref<any[]>([]);
   const loading = ref(true);
+  const filterMode = ref<"day" | "month" | "year" | "all">("day");
   const filterDate = ref(new Date().toISOString().split("T")[0]);
+  const filterMonth = ref(new Date().toISOString().substring(0, 7)); // YYYY-MM
+  const filterYear = ref(new Date().getFullYear().toString()); // YYYY
   const stats = ref({ totalTransaksi: 0, totalPendapatan: 0 });
 
   // Modal State
@@ -48,17 +51,43 @@ export function useAdminRiwayatTab() {
       const endOfDay = new Date(filterDate.value);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("pesanan")
         .select(
           `id, nomor_pesanan, nama_pelanggan, status, total_harga, metode_pembayaran, created_at, id_kasir, id_meja,
           meja:id_meja(nomor_meja),
           kasir:id_kasir(nama)`,
         )
-        .eq("id_toko", tokoId)
-        .gte("created_at", startOfDay.toISOString())
-        .lte("created_at", endOfDay.toISOString())
-        .order("created_at", { ascending: false });
+        .eq("id_toko", tokoId);
+
+      if (filterMode.value === "day" && filterDate.value) {
+        query = query
+          .gte("created_at", `${filterDate.value}T00:00:00Z`)
+          .lte("created_at", `${filterDate.value}T23:59:59Z`);
+      } else if (filterMode.value === "month" && filterMonth.value) {
+        const [year, month] = filterMonth.value.split("-");
+        const startDate = new Date(
+          parseInt(year),
+          parseInt(month) - 1,
+          1,
+        ).toISOString();
+        const endDate = new Date(
+          parseInt(year),
+          parseInt(month),
+          0,
+          23,
+          59,
+          59,
+        ).toISOString();
+        query = query.gte("created_at", startDate).lte("created_at", endDate);
+      } else if (filterMode.value === "year" && filterYear.value) {
+        const startDate = `${filterYear.value}-01-01T00:00:00Z`;
+        const endDate = `${filterYear.value}-12-31T23:59:59Z`;
+        query = query.gte("created_at", startDate).lte("created_at", endDate);
+      }
+      // Mode 'all' does not add date filters
+
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) throw error;
 
@@ -140,6 +169,9 @@ export function useAdminRiwayatTab() {
     riwayat,
     loading,
     filterDate,
+    filterMode,
+    filterMonth,
+    filterYear,
     stats,
     loadRiwayat,
     getStatusBadgeClass,
